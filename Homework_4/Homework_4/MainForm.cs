@@ -41,6 +41,7 @@ namespace Homework_4
             }
             else if(btn == btnCancel)
             {
+                tokenSource.Cancel();
                 CancellationCopy();
             }
         }
@@ -128,9 +129,8 @@ namespace Homework_4
             return string.Empty;
         }
 
-        private void CopyFile(Object obj)
+        private void CopyFile(string fileName)
         {
-            string fileName = obj.ToString();
             string destFile = Path.GetFileName(fileName);
             byte[] buffer = new byte[4096];
             using (FileStream sourceStream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
@@ -144,6 +144,7 @@ namespace Homework_4
                         currentBlockSize = sourceStream.Read(buffer, 0, buffer.Length);
                         destStream.Write(buffer, 0, currentBlockSize);
                     } while (currentBlockSize > 0);
+                    token.ThrowIfCancellationRequested();
                 }
             }
         }
@@ -157,7 +158,9 @@ namespace Homework_4
             }
             foreach (var fileName in pathesFrom)
             {
-                tasksLst.Add(Task.Factory.StartNew(CopyFile, fileName));
+                var task1 = new Task(() => CopyFile(fileName));
+                task1.Start();
+                var task2 = task1.ContinueWith(t => !t.IsCanceled);
                 this.Invoke(new Action<int>(ShowOnProgressBar), pathesFrom.Count);
             }        
         }
@@ -171,17 +174,12 @@ namespace Homework_4
 
         private void CancellationCopy()
         {
-            tokenSource.Cancel();
-            foreach (var item in tasksLst)
-            {
-                item.Wait(token);
-            }
             foreach (var item in pathesFrom)
             {
                 File.Delete(string.Format("{0}\\{1}", pathTo, Path.GetFileName(item)));
             }
             progressBar.Value = 0;
-            MessageBox.Show("Копирование прервано", "Предупреждение", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+            MessageBox.Show("Копирование отменено", "Предупреждение", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
         }
 
         #endregion
